@@ -1,5 +1,35 @@
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/**
+ * Minimal .env loader (no dependency). Reads KEY=VALUE lines from a .env file in
+ * the project root and populates process.env for any key not already set, so a
+ * real environment variable always wins over the file.
+ */
+function loadDotEnv() {
+  const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+  let text;
+  try {
+    text = readFileSync(join(projectRoot, ".env"), "utf8");
+  } catch {
+    return; // no .env file — that's fine
+  }
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    // Strip matching surrounding quotes.
+    if (val.length >= 2 && /^(["']).*\1$/.test(val)) val = val.slice(1, -1);
+    if (key && process.env[key] === undefined) process.env[key] = val;
+  }
+}
+
+loadDotEnv();
 
 function parseBool(value, fallback) {
   if (value === undefined) return fallback;

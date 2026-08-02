@@ -30,6 +30,41 @@ Then open **http://localhost:4517** in a browser. Type a message, press Enter.
 To reach it from your phone, point it at the host's LAN address
 (e.g. `http://192.168.1.20:4517`) — and set an `AUTH_TOKEN` first (see below).
 
+## Windows: run on your desktop, connect from your phone
+
+The easiest path on Windows. From the project folder in **PowerShell**:
+
+```powershell
+./scripts/start.ps1 -Workspace C:\dev\my-project
+```
+
+(or just **double-click `scripts\start.bat`** in Explorer.)
+
+The script installs dependencies on first run, generates an `AUTH_TOKEN` once
+and saves it to `.env`, then prints two links:
+
+```
+On this PC: http://localhost:4517/?token=…
+On phone  : http://192.168.1.20:4517/?token=…
+```
+
+Open the **phone** link on a device on the **same Wi-Fi**. That's it.
+
+### Windows firewall
+
+The first time Node tries to accept connections, Windows may pop up a
+**Windows Defender Firewall** dialog. Tick **Private networks** and click
+**Allow access** so your phone can reach the server. If you dismissed it, or the
+phone link times out, add the rule manually in an **admin** PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "Claude Remote" -Direction Inbound `
+  -Action Allow -Protocol TCP -LocalPort 4517 -Profile Private
+```
+
+If it still won't load, confirm the phone is on the same network and that
+`http://localhost:4517/?token=…` works locally on the PC first.
+
 ### Point it at a project
 
 By default Claude Code runs in the server's working directory. To target a
