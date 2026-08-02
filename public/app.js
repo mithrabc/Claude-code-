@@ -9,6 +9,12 @@ const connDot = $("#conn-dot");
 const meta = $("#meta");
 const menuBtn = $("#menu-btn");
 const menu = $("#menu");
+const wsOverlay = $("#ws-overlay");
+const wsList = $("#ws-list");
+const wsCustom = $("#ws-custom");
+const wsInput = $("#ws-input");
+const wsOpen = $("#ws-open");
+const wsClose = $("#ws-close");
 
 // Token comes from the page URL (?token=...) and is forwarded to the socket.
 const pageParams = new URLSearchParams(location.search);
@@ -18,6 +24,12 @@ let ws = null;
 let busy = false;
 let streamingEl = null; // the assistant bubble currently being appended to
 let reconnectDelay = 500;
+
+// Workspace state, kept in sync via hello / workspace messages.
+let workspace = "";
+let workspaces = [];
+let allowAny = false;
+let model = "";
 
 // --- Rendering -------------------------------------------------------------
 function atBottom() {
@@ -114,8 +126,12 @@ function connect() {
 function handle(msg) {
   switch (msg.type) {
     case "hello": {
-      const bits = [msg.mock ? "MOCK" : msg.model];
-      meta.textContent = shortenPath(msg.workspace) + " · " + bits.join(" ");
+      workspace = msg.workspace || "";
+      workspaces = msg.workspaces || [];
+      allowAny = Boolean(msg.allowAny);
+      model = msg.mock ? "MOCK" : msg.model;
+      renderMeta();
+      if (!wsOverlay.classList.contains("hidden")) renderWsList();
       setBusy(Boolean(msg.busy));
       break;
     }
@@ -149,6 +165,15 @@ function handle(msg) {
     case "reset":
       addEvent("— new conversation —");
       break;
+    case "workspace":
+      workspace = msg.workspace || workspace;
+      if (msg.workspaces) workspaces = msg.workspaces;
+      renderMeta();
+      renderWsList();
+      endStream();
+      addEvent(`📁 workspace → <code>${escapeHtml(shortenPath(workspace))}</code>`);
+      closeWsPanel();
+      break;
     case "busy":
       setBusy(msg.busy);
       break;
@@ -158,11 +183,65 @@ function handle(msg) {
   }
 }
 
+function renderMeta() {
+  meta.textContent = shortenPath(workspace) + (model ? " · " + model : "");
+  meta.title = workspace;
+}
+
 function shortenPath(p) {
   if (!p) return "";
-  const parts = p.split("/").filter(Boolean);
+  const parts = p.split(/[/\\]/).filter(Boolean);
   return parts.length <= 2 ? p : "…/" + parts.slice(-2).join("/");
 }
+
+// --- Workspace switcher ----------------------------------------------------
+function renderWsList() {
+  wsList.innerHTML = "";
+  for (const w of workspaces) {
+    const li = document.createElement("li");
+    if (w === workspace) li.className = "current";
+    li.innerHTML =
+      `<span class="folder">📁</span>` +
+      `<span class="path">${escapeHtml(w)}</span>` +
+      (w === workspace ? `<span class="badge">current</span>` : "");
+    li.addEventListener("click", () => switchWorkspace(w));
+    wsList.appendChild(li);
+  }
+  wsCustom.classList.toggle("hidden", !allowAny);
+}
+
+function openWsPanel() {
+  renderWsList();
+  wsOverlay.classList.remove("hidden");
+  if (allowAny) wsInput.value = "";
+}
+
+function closeWsPanel() {
+  wsOverlay.classList.add("hidden");
+}
+
+function switchWorkspace(path) {
+  const p = (path || "").trim();
+  if (!p || ws?.readyState !== WebSocket.OPEN) return;
+  if (p === workspace) {
+    closeWsPanel();
+    return;
+  }
+  ws.send(JSON.stringify({ type: "setWorkspace", path: p }));
+  // The panel closes when the server confirms via a "workspace" broadcast.
+}
+
+wsClose.addEventListener("click", closeWsPanel);
+wsOverlay.addEventListener("click", (e) => {
+  if (e.target === wsOverlay) closeWsPanel();
+});
+wsOpen.addEventListener("click", () => switchWorkspace(wsInput.value));
+wsInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    switchWorkspace(wsInput.value);
+  }
+});
 
 // --- Sending ---------------------------------------------------------------
 function send() {
@@ -200,9 +279,14 @@ menuBtn.addEventListener("click", (e) => {
 document.addEventListener("click", () => menu.classList.add("hidden"));
 menu.addEventListener("click", (e) => {
   const action = e.target.getAttribute("data-action");
-  if (!action || ws?.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: action }));
+  if (!action) return;
   menu.classList.add("hidden");
+  if (action === "workspace") {
+    openWsPanel();
+    return;
+  }
+  if (ws?.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: action }));
 });
 
 connect();

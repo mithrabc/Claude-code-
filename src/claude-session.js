@@ -26,6 +26,8 @@ export class ClaudeSession extends EventEmitter {
     this.claudeSessionId = null;
     this.child = null;
     this.busy = false;
+    // Working directory Claude Code runs in; changeable at runtime.
+    this.cwd = config.workspace;
   }
 
   get running() {
@@ -35,6 +37,16 @@ export class ClaudeSession extends EventEmitter {
   /** Start over with a brand-new conversation on the next prompt. */
   reset() {
     this.claudeSessionId = null;
+  }
+
+  /**
+   * Switch the working directory. The CLI session id is tied to a directory, so
+   * this also starts a fresh conversation. Refuses while a turn is in flight.
+   */
+  setCwd(dir) {
+    if (this.busy) throw new Error("Can't switch workspace while a turn is running");
+    this.cwd = dir;
+    this.reset();
   }
 
   /** Send one user prompt. Rejects if a turn is already in flight. */
@@ -79,7 +91,7 @@ export class ClaudeSession extends EventEmitter {
     this.busy = true;
     const args = this.#buildArgs(prompt);
     const child = spawn(config.claudeBin, args, {
-      cwd: config.workspace,
+      cwd: this.cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });

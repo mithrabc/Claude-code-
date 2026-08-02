@@ -34,6 +34,21 @@ On startup the server prints the phone URL **and a scannable QR code** of it
 (token included), so you can just point your camera at the terminal to open the
 UI. Set `QR=0` to turn the QR off.
 
+### Switch workspaces from the browser
+
+Configure a few projects and hop between them without restarting — from the
+**⋯ menu → Switch workspace…**:
+
+```bash
+WORKSPACES="/dev/api:/dev/web:/dev/infra" npm start   # ";"-separated on Windows
+```
+
+The switcher lists these (the initial `WORKSPACE` is always included). Picking
+one starts a fresh Claude Code conversation in that directory, and the change is
+broadcast to every connected device. To also allow opening an arbitrary typed
+path, set `ALLOW_ANY_WORKSPACE=1` — off by default so the browser can only reach
+the directories you listed.
+
 ## Windows: run on your desktop, connect from your phone
 
 The easiest path on Windows. From the project folder in **PowerShell**:
@@ -96,7 +111,9 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `PORT`            | `4517`         | Port to listen on.                                             |
 | `HOST`            | `0.0.0.0`      | Interface to bind.                                             |
 | `AUTH_TOKEN`      | _(empty)_      | Shared secret. When set, the UI needs `?token=…` to connect.   |
-| `WORKSPACE`       | _cwd_          | Directory Claude Code operates in.                             |
+| `WORKSPACE`       | _cwd_          | Initial directory Claude Code operates in.                     |
+| `WORKSPACES`      | _(WORKSPACE)_  | Extra dirs offered in the switcher (OS-delimited / comma list).|
+| `ALLOW_ANY_WORKSPACE` | `0`        | `1` lets the switcher open any existing typed path.            |
 | `CLAUDE_BIN`      | `claude`       | Path to the Claude Code CLI.                                   |
 | `CLAUDE_MODEL`    | _(cli default)_| Model override passed to `--model`.                            |
 | `PERMISSION_MODE` | `acceptEdits`  | Headless permission mode (`acceptEdits` / `bypassPermissions`).|
@@ -125,7 +142,8 @@ http://<host>:4517/?token=YOUR_TOKEN
 ## How it works
 
 - **`src/server.js`** — HTTP static server for the UI plus a WebSocket command
-  channel. All clients share one conversation and see the same stream.
+  channel. All clients share one conversation and see the same stream. Handles
+  workspace switch requests, validating each against the allowed list.
 - **`src/claude-session.js`** — spawns `claude -p … --output-format stream-json`
   per turn, parses the JSON-lines events, and captures the CLI session id so the
   next prompt resumes the same conversation with full history.

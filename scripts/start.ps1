@@ -12,16 +12,27 @@
   Directory Claude Code should operate in (the project you want to work on).
   Defaults to the value in .env, or the current directory.
 
+.PARAMETER Workspaces
+  Extra directories to offer in the web UI's workspace switcher.
+
+.PARAMETER AllowAny
+  Let the switcher open any existing typed path (off by default).
+
 .PARAMETER Port
   Port to listen on. Default 4517.
 
 .EXAMPLE
   ./scripts/start.ps1 -Workspace C:\dev\my-project
+
+.EXAMPLE
+  ./scripts/start.ps1 -Workspace C:\dev\api -Workspaces C:\dev\api,C:\dev\web
 #>
 
 [CmdletBinding()]
 param(
   [string]$Workspace,
+  [string[]]$Workspaces,
+  [switch]$AllowAny,
   [int]$Port = 4517
 )
 
@@ -71,6 +82,11 @@ if ([string]::IsNullOrWhiteSpace($token)) {
 }
 
 if ($Workspace) { $envMap["WORKSPACE"] = (Resolve-Path $Workspace).Path }
+if ($Workspaces) {
+  $resolved = $Workspaces | ForEach-Object { (Resolve-Path $_).Path }
+  $envMap["WORKSPACES"] = ($resolved -join ";") # ";" is the Windows path delimiter
+}
+if ($AllowAny) { $envMap["ALLOW_ANY_WORKSPACE"] = "1" }
 $envMap["PORT"] = "$Port"
 
 # Persist .env (keep it readable).

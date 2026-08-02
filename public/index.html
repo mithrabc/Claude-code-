@@ -17,12 +17,29 @@
       <div class="meta" id="meta">connecting…</div>
       <button id="menu-btn" class="icon-btn" title="Session actions" aria-label="Session actions">⋯</button>
       <div id="menu" class="menu hidden">
+        <button data-action="workspace">Switch workspace…</button>
         <button data-action="reset">New conversation</button>
         <button data-action="stop">Stop current turn</button>
       </div>
     </header>
 
     <main id="transcript" aria-live="polite"></main>
+
+    <div id="ws-overlay" class="overlay hidden">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ws-title">
+        <h2 id="ws-title">Workspace</h2>
+        <p class="sheet-sub">Switching starts a fresh conversation in the chosen directory.</p>
+        <ul id="ws-list"></ul>
+        <div id="ws-custom" class="hidden">
+          <label for="ws-input">Open another path</label>
+          <div class="row">
+            <input id="ws-input" type="text" placeholder="/absolute/path/to/project" autocomplete="off" spellcheck="false" />
+            <button id="ws-open" type="button">Open</button>
+          </div>
+        </div>
+        <button id="ws-close" class="sheet-close" type="button">Close</button>
+      </div>
+    </div>
 
     <form id="composer">
       <textarea

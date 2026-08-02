@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { statSync } from "node:fs";
+import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import qrcode from "qrcode-terminal";
@@ -101,12 +102,41 @@ httpServer.on("upgrade", (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
 });
 
+function isDir(p) {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    return null; // does not exist / not accessible
+  }
+}
+
+/**
+ * Resolve a requested workspace to an allowed, existing directory.
+ * Returns { ok, path } or { ok:false, error }.
+ */
+function resolveWorkspace(requested) {
+  if (!requested || typeof requested !== "string") {
+    return { ok: false, error: "No path provided." };
+  }
+  const target = resolve(requested);
+  const inList = config.workspaces.includes(target);
+  if (!inList && !config.allowAnyWorkspace) {
+    return { ok: false, error: "That workspace is not in the allowed list." };
+  }
+  const dir = isDir(target); // true = directory, false = exists but not a dir, null = missing
+  if (dir === null) return { ok: false, error: `Path not found: ${target}` };
+  if (dir === false) return { ok: false, error: `Not a directory: ${target}` };
+  return { ok: true, path: target };
+}
+
 wss.on("connection", (ws) => {
   clients.add(ws);
   ws.send(
     JSON.stringify({
       type: "hello",
-      workspace: config.workspace,
+      workspace: session.cwd,
+      workspaces: config.workspaces,
+      allowAny: config.allowAnyWorkspace,
       model: config.model || "(cli default)",
       mock: config.mock,
       busy: session.busy,
@@ -155,6 +185,28 @@ function handleClientMessage(ws, msg) {
       session.reset();
       broadcast({ type: "reset" });
       break;
+    case "setWorkspace": {
+      if (session.busy) {
+        ws.send(
+          JSON.stringify({ type: "error", message: "Can't switch workspace while a turn is running." })
+        );
+        return;
+      }
+      const res = resolveWorkspace(msg.path);
+      if (!res.ok) {
+        ws.send(JSON.stringify({ type: "error", message: res.error }));
+        return;
+      }
+      if (res.path === session.cwd) return; // no-op
+      try {
+        session.setCwd(res.path);
+      } catch (err) {
+        ws.send(JSON.stringify({ type: "error", message: err.message }));
+        return;
+      }
+      broadcast({ type: "workspace", workspace: res.path, workspaces: config.workspaces });
+      break;
+    }
     default:
       break;
   }

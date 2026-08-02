@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { readFileSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import { resolve, dirname, join, delimiter as PATH_DELIM } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -36,6 +36,19 @@ function parseBool(value, fallback) {
   return /^(1|true|yes|on)$/i.test(value);
 }
 
+function parseWorkspaces(value) {
+  if (!value) return [];
+  // Split on the OS path delimiter (";" on Windows, ":" on POSIX) plus commas
+  // and newlines. Using the platform delimiter avoids breaking Windows drive
+  // letters like "C:\dev".
+  const splitter = new RegExp(`[${PATH_DELIM === ";" ? ";" : ":"},\\r\\n]+`);
+  return value
+    .split(splitter)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => resolve(s));
+}
+
 export const config = {
   // Network
   host: process.env.HOST || "0.0.0.0",
@@ -45,8 +58,17 @@ export const config = {
   // If empty, the server runs open (fine for a trusted LAN / tunnel only).
   authToken: process.env.AUTH_TOKEN || "",
 
-  // Working directory Claude Code operates in.
+  // Working directory Claude Code operates in (the initial one).
   workspace: resolve(process.env.WORKSPACE || process.cwd()),
+
+  // Directories offered in the web UI's workspace switcher. Separate with the
+  // OS path delimiter (":" on POSIX, ";" on Windows), a comma, or newlines.
+  // The initial WORKSPACE is always included.
+  workspaces: parseWorkspaces(process.env.WORKSPACES),
+
+  // When true, the switcher also accepts an arbitrary typed path (that exists).
+  // Off by default so the browser can't reach beyond the configured list.
+  allowAnyWorkspace: parseBool(process.env.ALLOW_ANY_WORKSPACE, false),
 
   // Path to the Claude Code CLI.
   claudeBin: process.env.CLAUDE_BIN || "claude",
@@ -64,3 +86,8 @@ export const config = {
 
   home: homedir(),
 };
+
+// Ensure the initial workspace is always the first offered option, de-duplicated.
+config.workspaces = [config.workspace, ...config.workspaces].filter(
+  (p, i, arr) => arr.indexOf(p) === i
+);
