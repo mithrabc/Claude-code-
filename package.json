@@ -1,0 +1,20 @@
+{
+  "name": "claude-remote",
+  "version": "0.1.0",
+  "description": "Remote control for Claude Code — drive a Claude Code session from any browser.",
+  "type": "module",
+  "bin": {
+    "claude-remote": "./src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "license": "MIT"
+}
