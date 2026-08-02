@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import qrcode from "qrcode-terminal";
 import { config } from "./config.js";
 import { ClaudeSession } from "./claude-session.js";
+import { getLanIp } from "./net.js";
 
 const PUBLIC_DIR = fileURLToPath(new URL("../public", import.meta.url));
 
@@ -170,7 +172,34 @@ httpServer.listen(config.port, config.host, () => {
   if (!config.authToken) {
     console.log("  ⚠  No AUTH_TOKEN set — do not expose this beyond a trusted network.");
   }
+  printPhoneAccess();
 });
+
+/**
+ * Print the phone URL and, unless disabled, a scannable QR code for it.
+ * Set QR=0 to skip the QR (e.g. on a terminal that mangles block characters).
+ */
+function printPhoneAccess() {
+  const query = config.authToken ? `/?token=${encodeURIComponent(config.authToken)}` : "/";
+  const bound = config.host === "0.0.0.0" || config.host === "::";
+  const ip = bound ? getLanIp() : config.host;
+  if (!ip) {
+    console.log("  (no LAN address detected — reachable at localhost only)");
+    return;
+  }
+  const url = `http://${ip}:${config.port}${query}`;
+  console.log(`  phone     : ${url}`);
+  if (/^(0|false|no|off)$/i.test(process.env.QR || "")) return;
+  qrcode.generate(url, { small: true }, (qr) => {
+    console.log("\n  Scan to open on your phone (same Wi-Fi):\n");
+    console.log(
+      qr
+        .split("\n")
+        .map((line) => "  " + line)
+        .join("\n")
+    );
+  });
+}
 
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, () => {

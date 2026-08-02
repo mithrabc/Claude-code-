@@ -30,6 +30,10 @@ Then open **http://localhost:4517** in a browser. Type a message, press Enter.
 To reach it from your phone, point it at the host's LAN address
 (e.g. `http://192.168.1.20:4517`) — and set an `AUTH_TOKEN` first (see below).
 
+On startup the server prints the phone URL **and a scannable QR code** of it
+(token included), so you can just point your camera at the terminal to open the
+UI. Set `QR=0` to turn the QR off.
+
 ## Windows: run on your desktop, connect from your phone
 
 The easiest path on Windows. From the project folder in **PowerShell**:
@@ -97,6 +101,7 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `CLAUDE_MODEL`    | _(cli default)_| Model override passed to `--model`.                            |
 | `PERMISSION_MODE` | `acceptEdits`  | Headless permission mode (`acceptEdits` / `bypassPermissions`).|
 | `MOCK`            | `0`            | `1` uses the built-in mock backend.                            |
+| `QR`              | `1`            | `0` skips the startup QR code of the phone URL.                |
 
 ## Security ⚠️
 
@@ -124,9 +129,12 @@ http://<host>:4517/?token=YOUR_TOKEN
 - **`src/claude-session.js`** — spawns `claude -p … --output-format stream-json`
   per turn, parses the JSON-lines events, and captures the CLI session id so the
   next prompt resumes the same conversation with full history.
+- **`src/net.js`** — detects the LAN IPv4 used to build the phone URL / QR code.
 - **`public/`** — a dependency-free, mobile-first web client.
 
-The only runtime dependency is [`ws`](https://github.com/websockets/ws).
+Runtime dependencies: [`ws`](https://github.com/websockets/ws) (WebSocket) and
+[`qrcode-terminal`](https://github.com/gtanner/qrcode-terminal) (startup QR) —
+both zero-dependency themselves.
 
 ## License
 
