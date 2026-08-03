@@ -15,6 +15,15 @@ const wsCustom = $("#ws-custom");
 const wsInput = $("#ws-input");
 const wsOpen = $("#ws-open");
 const wsClose = $("#ws-close");
+const apOverlay = $("#ap-overlay");
+const apGoal = $("#ap-goal");
+const apTurns = $("#ap-turns");
+const apTurnsVal = $("#ap-turns-val");
+const apStart = $("#ap-start");
+const apClose = $("#ap-close");
+const apBar = $("#ap-bar");
+const apStatus = $("#ap-status");
+const apStop = $("#ap-stop");
 
 // Token comes from the page URL (?token=...) and is forwarded to the socket.
 const pageParams = new URLSearchParams(location.search);
@@ -30,6 +39,9 @@ let workspace = "";
 let workspaces = [];
 let allowAny = false;
 let model = "";
+
+// Autopilot state, kept in sync via hello / autopilot messages.
+let autopilot = { active: false, goal: "", turn: 0, maxTurns: 0 };
 
 // --- Rendering -------------------------------------------------------------
 function atBottom() {
@@ -80,7 +92,7 @@ function escapeHtml(s) {
 // --- Busy / connection state ----------------------------------------------
 function setBusy(v) {
   busy = v;
-  sendBtn.disabled = v || ws?.readyState !== WebSocket.OPEN;
+  sendBtn.disabled = v || autopilot.active || ws?.readyState !== WebSocket.OPEN;
   if (ws?.readyState === WebSocket.OPEN) {
     connDot.className = "dot " + (v ? "busy" : "online");
   }
@@ -132,9 +144,17 @@ function handle(msg) {
       model = msg.mock ? "MOCK" : msg.model;
       renderMeta();
       if (!wsOverlay.classList.contains("hidden")) renderWsList();
+      if (msg.autopilot) {
+        autopilot = msg.autopilot;
+        renderAutopilot();
+      }
+      if (msg.autopilotMaxTurns) apTurns.value = apTurnsVal.textContent = msg.autopilotMaxTurns;
       setBusy(Boolean(msg.busy));
       break;
     }
+    case "autopilot":
+      handleAutopilot(msg);
+      break;
     case "user":
       // Reflect prompts (including those sent from other devices).
       endStream();
@@ -243,6 +263,71 @@ wsInput.addEventListener("keydown", (e) => {
   }
 });
 
+// --- Autopilot --------------------------------------------------------------
+function handleAutopilot(msg) {
+  autopilot = { active: msg.active, goal: msg.goal, turn: msg.turn, maxTurns: msg.maxTurns };
+  renderAutopilot();
+  switch (msg.state) {
+    case "started":
+      closeApPanel();
+      addEvent(`🤖 autopilot engaged — up to ${msg.maxTurns} turns`);
+      break;
+    case "done":
+      addEvent(`🤖 autopilot: goal complete after ${msg.turn} turn${msg.turn === 1 ? "" : "s"}`);
+      break;
+    case "maxTurns":
+      addEvent(`🤖 autopilot stopped — turn limit (${msg.maxTurns}) reached`, "error");
+      break;
+    case "error":
+      addEvent("🤖 autopilot stopped — the turn errored", "error");
+      break;
+    case "stopped":
+      addEvent("🤖 autopilot disengaged");
+      break;
+    // "turn" just refreshes the status bar.
+  }
+}
+
+function renderAutopilot() {
+  setBusy(busy); // refresh the send button, which also respects autopilot
+  apBar.classList.toggle("hidden", !autopilot.active);
+  if (autopilot.active) {
+    apStatus.textContent = `🤖 Autopilot · turn ${autopilot.turn}/${autopilot.maxTurns}`;
+    apStatus.title = autopilot.goal;
+  }
+  input.disabled = autopilot.active;
+  input.placeholder = autopilot.active
+    ? "Autopilot is driving — stop it to take over."
+    : "Message Claude Code…  (Enter to send, Shift+Enter for newline)";
+}
+
+function openApPanel() {
+  apOverlay.classList.remove("hidden");
+  apGoal.focus();
+}
+
+function closeApPanel() {
+  apOverlay.classList.add("hidden");
+}
+
+function startAutopilot() {
+  const goal = apGoal.value.trim();
+  if (!goal || ws?.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "autopilot", goal, maxTurns: Number(apTurns.value) }));
+  apGoal.value = "";
+  // The panel closes when the server confirms via an "autopilot" broadcast.
+}
+
+apTurns.addEventListener("input", () => (apTurnsVal.textContent = apTurns.value));
+apStart.addEventListener("click", startAutopilot);
+apClose.addEventListener("click", closeApPanel);
+apOverlay.addEventListener("click", (e) => {
+  if (e.target === apOverlay) closeApPanel();
+});
+apStop.addEventListener("click", () => {
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "autopilotStop" }));
+});
+
 // --- Sending ---------------------------------------------------------------
 function send() {
   const text = input.value.trim();
@@ -283,6 +368,10 @@ menu.addEventListener("click", (e) => {
   menu.classList.add("hidden");
   if (action === "workspace") {
     openWsPanel();
+    return;
+  }
+  if (action === "autopilot") {
+    openApPanel();
     return;
   }
   if (ws?.readyState !== WebSocket.OPEN) return;

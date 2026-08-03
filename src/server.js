@@ -8,6 +8,7 @@ import { WebSocketServer } from "ws";
 import qrcode from "qrcode-terminal";
 import { config } from "./config.js";
 import { ClaudeSession } from "./claude-session.js";
+import { Autopilot } from "./autopilot.js";
 import { getLanIp } from "./net.js";
 
 const PUBLIC_DIR = fileURLToPath(new URL("../public", import.meta.url));
@@ -33,6 +34,16 @@ function broadcast(msg) {
     if (ws.readyState === ws.OPEN) ws.send(data);
   }
 }
+
+/** Echo a prompt to every client and submit it to the session. May throw. */
+function runPrompt(text) {
+  broadcast({ type: "user", text });
+  broadcast({ type: "busy", busy: true });
+  session.send(text);
+}
+
+const autopilot = new Autopilot(session, runPrompt);
+autopilot.on("status", (s) => broadcast({ type: "autopilot", ...s }));
 
 // Re-emit session events to every connected browser.
 session.on("system", (e) => broadcast({ type: "system", ...e }));
@@ -141,6 +152,8 @@ wss.on("connection", (ws) => {
       mock: config.mock,
       busy: session.busy,
       sessionId: session.claudeSessionId,
+      autopilot: autopilot.status,
+      autopilotMaxTurns: config.autopilotMaxTurns,
     })
   );
 
@@ -163,25 +176,40 @@ function handleClientMessage(ws, msg) {
     case "prompt": {
       const text = (msg.text || "").trim();
       if (!text) return;
+      if (autopilot.active) {
+        ws.send(
+          JSON.stringify({ type: "error", message: "Autopilot is driving — stop it to take over." })
+        );
+        return;
+      }
       if (session.busy) {
         ws.send(JSON.stringify({ type: "error", message: "Busy — a turn is already running." }));
         return;
       }
-      // Echo the user's prompt to every client so all views stay in sync.
-      broadcast({ type: "user", text });
-      broadcast({ type: "busy", busy: true });
       try {
-        session.send(text);
+        // Echo the user's prompt to every client so all views stay in sync.
+        runPrompt(text);
       } catch (err) {
         broadcast({ type: "error", message: err.message });
         broadcast({ type: "busy", busy: false });
       }
       break;
     }
+    case "autopilot": {
+      const res = autopilot.start(msg.goal, msg.maxTurns);
+      if (!res.ok) ws.send(JSON.stringify({ type: "error", message: res.error }));
+      break;
+    }
+    case "autopilotStop":
+      autopilot.stop();
+      session.stop();
+      break;
     case "stop":
+      autopilot.stop();
       session.stop();
       break;
     case "reset":
+      autopilot.stop();
       session.reset();
       broadcast({ type: "reset" });
       break;
@@ -198,6 +226,7 @@ function handleClientMessage(ws, msg) {
         return;
       }
       if (res.path === session.cwd) return; // no-op
+      autopilot.stop();
       try {
         session.setCwd(res.path);
       } catch (err) {

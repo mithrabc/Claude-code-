@@ -204,10 +204,14 @@ export class ClaudeSession extends EventEmitter {
       raw: { mock: true },
     });
 
+    // Let an autopilot run complete in mock mode: the first continuation
+    // prompt gets a reply carrying the completion marker on its own line.
+    const autopilotDone = /^Continue working toward the autopilot goal/.test(prompt);
     const reply =
       `You said: "${prompt}".\n\n` +
       "This is the mock backend — set MOCK=0 (and install the Claude CLI) " +
-      "to talk to the real Claude Code.\n";
+      "to talk to the real Claude Code.\n" +
+      (autopilotDone ? "\nAUTOPILOT DONE\n" : "");
     const words = reply.split(/(\s+)/);
     let i = 0;
     const timer = setInterval(() => {

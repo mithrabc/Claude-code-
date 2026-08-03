@@ -245,6 +245,51 @@ body {
 }
 .sheet-close:hover { background: var(--panel-2); }
 
+/* Autopilot -------------------------------------------------------------- */
+.field-label {
+  display: block; color: var(--muted); font-size: 12px; margin: 12px 0 6px;
+}
+.field-label strong { color: var(--accent); }
+#ap-goal {
+  width: 100%; resize: vertical; min-height: 68px;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; font: inherit; line-height: 1.4;
+}
+#ap-goal:focus { outline: none; border-color: var(--accent); }
+#ap-goal::placeholder { color: var(--muted); }
+#ap-turns { width: 100%; accent-color: var(--accent); margin: 0 0 14px; }
+#ap-start {
+  width: 100%; padding: 12px; border: 0; border-radius: 10px;
+  background: var(--accent); color: #fff; cursor: pointer; font: inherit;
+  font-weight: 600; margin-bottom: 8px;
+}
+#ap-start:hover { background: var(--accent-2); }
+
+#ap-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border-top: 1px solid var(--accent);
+  font-size: 13.5px;
+}
+#ap-bar.hidden { display: none; }
+#ap-status {
+  flex: 1 1 auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#ap-stop {
+  flex: 0 0 auto; border: 1px solid var(--accent); border-radius: 999px;
+  background: transparent; color: var(--accent-2); padding: 4px 14px;
+  cursor: pointer; font: inherit; font-size: 13px;
+}
+#ap-stop:hover { background: var(--accent); color: #fff; }
+
+#input:disabled { opacity: .6; cursor: not-allowed; }
+
 @media (min-width: 720px) {
   #transcript { padding-left: max(12px, calc(50vw - 360px)); padding-right: max(12px, calc(50vw - 360px)); }
   .msg, .event { max-width: 680px; }

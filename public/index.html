@@ -17,6 +17,7 @@
       <div class="meta" id="meta">connecting…</div>
       <button id="menu-btn" class="icon-btn" title="Session actions" aria-label="Session actions">⋯</button>
       <div id="menu" class="menu hidden">
+        <button data-action="autopilot">Autopilot…</button>
         <button data-action="workspace">Switch workspace…</button>
         <button data-action="reset">New conversation</button>
         <button data-action="stop">Stop current turn</button>
@@ -39,6 +40,32 @@
         </div>
         <button id="ws-close" class="sheet-close" type="button">Close</button>
       </div>
+    </div>
+
+    <div id="ap-overlay" class="overlay hidden">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ap-title">
+        <h2 id="ap-title">🤖 Autopilot</h2>
+        <p class="sheet-sub">
+          Give Claude a goal and pocket your phone: it keeps working turn after
+          turn — unattended — until it declares the goal done or hits the turn limit.
+        </p>
+        <label class="field-label" for="ap-goal">Goal</label>
+        <textarea
+          id="ap-goal"
+          rows="3"
+          placeholder="e.g. Make the test suite pass, then update the changelog"
+          autocomplete="off"
+        ></textarea>
+        <label class="field-label" for="ap-turns">Turn limit: <strong id="ap-turns-val">8</strong></label>
+        <input id="ap-turns" type="range" min="1" max="25" value="8" />
+        <button id="ap-start" type="button">Engage autopilot</button>
+        <button id="ap-close" class="sheet-close" type="button">Close</button>
+      </div>
+    </div>
+
+    <div id="ap-bar" class="hidden">
+      <span id="ap-status">🤖 Autopilot engaged</span>
+      <button id="ap-stop" type="button">Stop</button>
     </div>
 
     <form id="composer">

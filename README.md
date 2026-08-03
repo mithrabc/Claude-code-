@@ -49,6 +49,26 @@ broadcast to every connected device. To also allow opening an arbitrary typed
 path, set `ALLOW_ANY_WORKSPACE=1` — off by default so the browser can only reach
 the directories you listed.
 
+### Autopilot: run autonomously 🤖
+
+Hand Claude a goal and pocket your phone. From **⋯ menu → Autopilot…**, type a
+goal (e.g. _"make the test suite pass, then update the changelog"_), pick a turn
+limit, and hit **Engage autopilot**. The server then drives the session
+unattended: whenever a turn finishes without the goal being complete, it
+automatically sends the next *continue* prompt — no human in the loop — until:
+
+- Claude declares completion (it's instructed to end its final reply with the
+  line `AUTOPILOT DONE`),
+- the turn limit is reached (default 8, per-run adjustable, hard cap 50), or
+- a turn errors, or you press **Stop** in the status bar.
+
+While engaged, a status bar above the composer shows the live turn count on
+every connected device, and manual prompts are held off so they don't interleave
+with the run. Because autopilot is exactly as unsupervised as it sounds, keep
+`PERMISSION_MODE` and the workspace scoped to what you're happy for Claude to do
+alone — and set the turn limit with cost in mind: every autopilot turn is a
+full Claude Code turn.
+
 ## Windows: run on your desktop, connect from your phone
 
 The easiest path on Windows. From the project folder in **PowerShell**:
@@ -117,6 +137,7 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 | `CLAUDE_BIN`      | `claude`       | Path to the Claude Code CLI.                                   |
 | `CLAUDE_MODEL`    | _(cli default)_| Model override passed to `--model`.                            |
 | `PERMISSION_MODE` | `acceptEdits`  | Headless permission mode (`acceptEdits` / `bypassPermissions`).|
+| `AUTOPILOT_MAX_TURNS` | `8`        | Default turn limit for autopilot runs (hard cap 50).           |
 | `MOCK`            | `0`            | `1` uses the built-in mock backend.                            |
 | `QR`              | `1`            | `0` skips the startup QR code of the phone URL.                |
 
@@ -147,6 +168,9 @@ http://<host>:4517/?token=YOUR_TOKEN
 - **`src/claude-session.js`** — spawns `claude -p … --output-format stream-json`
   per turn, parses the JSON-lines events, and captures the CLI session id so the
   next prompt resumes the same conversation with full history.
+- **`src/autopilot.js`** — the autonomous driver: re-prompts the session after
+  each finished turn until Claude emits the `AUTOPILOT DONE` marker, the turn
+  limit is hit, or a human stops it.
 - **`src/net.js`** — detects the LAN IPv4 used to build the phone URL / QR code.
 - **`public/`** — a dependency-free, mobile-first web client.
 

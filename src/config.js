@@ -80,6 +80,10 @@ export const config = {
   // let tools run without an interactive prompt (there is no human at the terminal).
   permissionMode: process.env.PERMISSION_MODE || "acceptEdits",
 
+  // Default turn cap for autopilot (unattended multi-turn) runs. The browser
+  // can pick a different cap per run; the server hard-limits it to 50.
+  autopilotMaxTurns: Math.min(Math.max(Number(process.env.AUTOPILOT_MAX_TURNS) || 8, 1), 50),
+
   // Force the built-in mock backend instead of spawning the real CLI.
   // Handy for developing the UI where the CLI is unavailable.
   mock: parseBool(process.env.MOCK, false),
